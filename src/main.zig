@@ -1,6 +1,7 @@
 const glfw = @import("glfw");
 const gl = @import("gl");
 const zm = @import("zm");
+const std = @import("std");
 
 var gl_procs: gl.ProcTable = undefined;
 
@@ -25,9 +26,23 @@ const default_shader_frag_src =
     \\in vec3 v_Position;
     \\uniform vec3 u_Tint;
     \\void main() {
-    \\  o_Color = vec4(v_Position + 0.5 + u_Tint, 1.0);
+    \\  o_Color = vec4(v_Position, 1.0);
     \\}
 ;
+
+fn glDebugCallback(source: c_uint, t: c_uint, id: c_uint, severity: c_uint, length: c_int, message: [*:0]const u8, user_param: ?*const anyopaque) callconv(.C) void {
+    _ = user_param; // autofix
+    _ = length; // autofix
+    _ = t; // autofix
+    _ = source; // autofix
+    switch (severity) {
+        gl.DEBUG_SEVERITY_HIGH => std.log.err("Error({d}): {s}", .{ id, message }),
+        gl.DEBUG_SEVERITY_MEDIUM => std.log.err("Error({d}): {s}", .{ id, message }),
+        gl.DEBUG_SEVERITY_LOW => std.log.warn("Warn({d}): {s}", .{ id, message }),
+        gl.DEBUG_SEVERITY_NOTIFICATION => std.log.info("Info({d}): {s}", .{ id, message }),
+        else => unreachable,
+    }
+}
 
 pub fn main() !void {
     const status = glfw.init(.{});
@@ -36,7 +51,7 @@ pub fn main() !void {
     }
     defer glfw.terminate();
 
-    const window = glfw.Window.create(1920, 1080, "GLFW/OpenGL example using zm", null, null, .{});
+    const window = glfw.Window.create(1280, 720, "GLFW/OpenGL example using zm", null, null, .{});
     defer window.?.destroy();
 
     glfw.makeContextCurrent(window);
@@ -45,6 +60,11 @@ pub fn main() !void {
         @panic("could not get glproc");
     }
     gl.makeProcTableCurrent(&gl_procs);
+
+    gl.Enable(gl.DEBUG_OUTPUT);
+    gl.Enable(gl.DEBUG_OUTPUT_SYNCHRONOUS);
+
+    gl.DebugMessageCallback(glDebugCallback, null);
 
     glfw.swapInterval(1);
 
@@ -70,7 +90,11 @@ pub fn main() !void {
     const vertices = [_]f32{
         -0.5, -0.5, 0.0,
         0.5,  -0.5, 0.0,
-        0.0,  0.5,  0.0,
+        -0.5, 0.5,  0.0,
+
+        0.5,  -0.5, 0.0,
+        0.5,  0.5,  0.0,
+        -0.5, 0.5,  0.0,
     };
 
     var vao: c_uint = undefined;
@@ -80,54 +104,53 @@ pub fn main() !void {
     var vbo: c_uint = undefined;
     gl.CreateBuffers(1, (&vbo)[0..1]);
     gl.BindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.BufferData(gl.ARRAY_BUFFER, @sizeOf(f32) * 3 * 3, &vertices, gl.STATIC_DRAW);
+    gl.BufferData(gl.ARRAY_BUFFER, @sizeOf(f32) * 3 * 6, &vertices, gl.STATIC_DRAW);
 
     gl.EnableVertexAttribArray(0);
     gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, @sizeOf(f32) * 3, 0);
 
     var z: f32 = -2.0;
     var direction: bool = false; // false => camera gets away, true => camera gets closer
-    var rotation: f32 = 0.0;
 
     while (!window.?.shouldClose()) {
         switch (direction) {
             true => {
                 z += 0.04;
-                if (z > -1.5) direction = false;
+                if (z > 5.0) direction = false;
             },
             false => {
                 z -= 0.04;
-                if (z < -10.0) direction = true;
+                if (z < -5.0) direction = true;
             },
         }
-
-        rotation += 0.5;
 
         gl.ClearColor(0.1, 0.1, 0.1, 1);
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         const tint = zm.Vec3.from(.{ 0.0, 0.0, 1.0 });
 
-        const proj = zm.Mat4.perspective(zm.toRadians(65.0), 16.0 / 9.0, 0.05, 100.0);
-        const view = zm.Mat4.translation(0.0, 0.0, z);
-        const model = zm.Mat4.rotation(zm.Vec3.forward(), zm.toRadians(rotation));
+        const proj = zm.Mat4.perspective(zm.toRadians(55.0), 16.0 / 9.0, 0.05, 100.0);
+        const view = zm.Mat4.lookAt(zm.Vec3.from(.{ 3, 4, z }), zm.Vec3.zero(), zm.Vec3.up());
+        // const view = zm.Mat4.translation(0.0, 0.0, 5.0);
+        const model = zm.Mat4.identity();
 
         const tint_loc = gl.GetUniformLocation(program, "u_Tint");
         gl.Uniform3f(tint_loc, tint.x(), tint.y(), tint.z());
 
         const proj_loc = gl.GetUniformLocation(program, "u_Projection");
         // transposition needed in OpenGL
-        gl.UniformMatrix4fv(proj_loc, 1, gl.FALSE, @ptrCast(&(proj.transpose())));
+        gl.UniformMatrix4fv(proj_loc, 1, gl.TRUE, @ptrCast(&(proj)));
 
         const view_loc = gl.GetUniformLocation(program, "u_View");
         // transposition needed in OpenGL
-        gl.UniformMatrix4fv(view_loc, 1, gl.FALSE, @ptrCast(&(view.transpose())));
+        const v = view;
+        gl.UniformMatrix4fv(view_loc, 1, gl.TRUE, @ptrCast(&(v)));
 
         const model_loc = gl.GetUniformLocation(program, "u_Model");
         // transposition needed in OpenGL
-        gl.UniformMatrix4fv(model_loc, 1, gl.FALSE, @ptrCast(&(model.transpose())));
+        gl.UniformMatrix4fv(model_loc, 1, gl.TRUE, @ptrCast(&(model)));
 
-        gl.DrawArrays(gl.TRIANGLES, 0, 3);
+        gl.DrawArrays(gl.TRIANGLES, 0, 6);
 
         window.?.swapBuffers();
         glfw.pollEvents();
