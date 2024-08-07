@@ -26,7 +26,7 @@ const default_shader_frag_src =
     \\in vec3 v_Position;
     \\uniform vec3 u_Tint;
     \\void main() {
-    \\  o_Color = vec4(v_Position, 1.0);
+    \\  o_Color = vec4(v_Position + 0.5 + u_Tint, 1.0);
     \\}
 ;
 
@@ -66,6 +66,8 @@ pub fn main() !void {
 
     gl.DebugMessageCallback(glDebugCallback, null);
 
+    gl.Enable(gl.DEPTH_TEST);
+
     glfw.swapInterval(1);
 
     // Create OpenGL shaders
@@ -88,13 +90,53 @@ pub fn main() !void {
     gl.UseProgram(program);
 
     const vertices = [_]f32{
-        -0.5, -0.5, 0.0,
-        0.5,  -0.5, 0.0,
-        -0.5, 0.5,  0.0,
+        // Front face
+        -0.5, -0.5, 0.5, // bottom left
+        0.5, -0.5, 0.5, // bottom right
+        0.5, 0.5, 0.5, // top right
+        0.5, 0.5, 0.5, // top right
+        -0.5, 0.5, 0.5, // top left
+        -0.5, -0.5, 0.5, // bottom left
 
-        0.5,  -0.5, 0.0,
-        0.5,  0.5,  0.0,
-        -0.5, 0.5,  0.0,
+        // Back face
+        -0.5, -0.5, -0.5, // bottom left
+        0.5, -0.5, -0.5, // bottom right
+        0.5, 0.5, -0.5, // top right
+        0.5, 0.5, -0.5, // top right
+        -0.5, 0.5, -0.5, // top left
+        -0.5, -0.5, -0.5, // bottom left
+
+        // Left face
+        -0.5, 0.5, 0.5, // top right
+        -0.5, 0.5, -0.5, // top left
+        -0.5, -0.5, -0.5, // bottom left
+        -0.5, -0.5, -0.5, // bottom left
+        -0.5, -0.5, 0.5, // bottom right
+        -0.5, 0.5, 0.5, // top right
+
+        // Right face
+        0.5, 0.5, 0.5, // top left
+        0.5, 0.5, -0.5, // top right
+        0.5, -0.5, -0.5, // bottom right
+        0.5, -0.5, -0.5, // bottom right
+        0.5, -0.5, 0.5, // bottom left
+        0.5, 0.5, 0.5, // top left
+
+        // Top face
+        -0.5, 0.5, -0.5, // bottom left
+        0.5, 0.5, -0.5, // bottom right
+        0.5, 0.5, 0.5, // top right
+        0.5, 0.5, 0.5, // top right
+        -0.5, 0.5, 0.5, // top left
+        -0.5, 0.5, -0.5, // bottom left
+
+        // Bottom face
+        -0.5, -0.5, -0.5, // top right
+        0.5, -0.5, -0.5, // top left
+        0.5, -0.5, 0.5, // bottom left
+        0.5, -0.5, 0.5, // bottom left
+        -0.5, -0.5, 0.5, // bottom right
+        -0.5, -0.5, -0.5, // top right;
     };
 
     var vao: c_uint = undefined;
@@ -104,35 +146,37 @@ pub fn main() !void {
     var vbo: c_uint = undefined;
     gl.CreateBuffers(1, (&vbo)[0..1]);
     gl.BindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.BufferData(gl.ARRAY_BUFFER, @sizeOf(f32) * 3 * 6, &vertices, gl.STATIC_DRAW);
+    gl.BufferData(gl.ARRAY_BUFFER, @sizeOf(f32) * vertices.len, &vertices, gl.STATIC_DRAW);
 
     gl.EnableVertexAttribArray(0);
     gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, @sizeOf(f32) * 3, 0);
 
-    var z: f32 = -2.0;
+    var t_rotation: f32 = 0.0;
     var direction: bool = false; // false => camera gets away, true => camera gets closer
 
     while (!window.?.shouldClose()) {
         switch (direction) {
             true => {
-                z += 0.04;
-                if (z > 5.0) direction = false;
+                t_rotation += 0.02;
+                if (t_rotation > 1.5) direction = false;
             },
             false => {
-                z -= 0.04;
-                if (z < -5.0) direction = true;
+                t_rotation -= 0.02;
+                if (t_rotation < -0.5) direction = true;
             },
         }
 
-        gl.ClearColor(0.1, 0.1, 0.1, 1);
+        gl.ClearColor(0.0, 0.0, 0.0, 1);
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        const tint = zm.Vec3.from(.{ 0.0, 0.0, 1.0 });
+        const tint = zm.Vec3.from(.{ 0.0, 0.0, 0.0 });
 
         const proj = zm.Mat4.perspective(zm.toRadians(55.0), 16.0 / 9.0, 0.05, 100.0);
-        const view = zm.Mat4.lookAt(zm.Vec3.from(.{ 3, 4, z }), zm.Vec3.zero(), zm.Vec3.up());
-        // const view = zm.Mat4.translation(0.0, 0.0, 5.0);
-        const model = zm.Mat4.identity();
+        const view = zm.Mat4.lookAt(zm.Vec3.from(.{ 3, 3, 3 }), zm.Vec3.zero(), zm.Vec3.up());
+
+        const rotation1 = zm.Quaternion.fromEulerAngles(zm.Vec3.from(.{ 0.0, 0.0, 0.0 }));
+        const rotation2 = zm.Quaternion.fromEulerAngles(zm.Vec3.from(.{ zm.toRadians(90.0), 0.0, zm.toRadians(90.0) }));
+        const model = zm.Mat4.fromQuaternion(zm.Quaternion.slerp(rotation1, rotation2, t_rotation)).multiply(zm.Mat4.scaling(1.5, 1.5, 1.5));
 
         const tint_loc = gl.GetUniformLocation(program, "u_Tint");
         gl.Uniform3f(tint_loc, tint.x(), tint.y(), tint.z());
@@ -150,7 +194,7 @@ pub fn main() !void {
         // transposition needed in OpenGL
         gl.UniformMatrix4fv(model_loc, 1, gl.TRUE, @ptrCast(&(model)));
 
-        gl.DrawArrays(gl.TRIANGLES, 0, 6);
+        gl.DrawArrays(gl.TRIANGLES, 0, vertices.len / 3);
 
         window.?.swapBuffers();
         glfw.pollEvents();
