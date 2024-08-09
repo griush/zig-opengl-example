@@ -175,8 +175,8 @@ pub fn main() !void {
         const view = zm.Mat4.lookAt(zm.Vec3.from(.{ 3, 3, 3 }), zm.Vec3.zero(), zm.Vec3.up());
 
         const rotation1 = zm.Quaternion.fromEulerAngles(zm.Vec3.from(.{ 0.0, 0.0, 0.0 }));
-        const rotation2 = zm.Quaternion.fromEulerAngles(zm.Vec3.from(.{ zm.toRadians(90.0), 0.0, zm.toRadians(90.0) }));
-        const model = zm.Mat4.fromQuaternion(zm.Quaternion.slerp(rotation1, rotation2, t_rotation)).multiply(zm.Mat4.scaling(1.5, 1.5, 1.5));
+        const rotation2 = zm.Quaternion.fromEulerAngles(zm.Vec3.from(.{ 0.0, 0.0, zm.toRadians(180.0) }));
+        const model = zm.Mat4.fromQuaternion(zm.Quaternion.slerp(rotation1, rotation2, zm.sigmoid(t_rotation * 12.0 - 6.0))).multiply(zm.Mat4.scaling(1.5, 1.5, 1.5));
 
         const tint_loc = gl.GetUniformLocation(program, "u_Tint");
         gl.Uniform3f(tint_loc, tint.x(), tint.y(), tint.z());

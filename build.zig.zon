@@ -7,8 +7,8 @@
 
     .dependencies = .{
         .zm = .{
-            .url = "git+https://github.com/griush/zm#0803a75095dc9068d4b967c924e47037d2836e81",
-            .hash = "122058b37b4229f1e0363030072c168e41975234cbd2089d3570f6df07debf476b23",
+            .url = "git+https://github.com/griush/zm#0ea83ef5cdf2b3d63c309e9ed1cf57e54d537223",
+            .hash = "122019024022f45ac14d7e52fa35c516bc801140ce219fec3e0f16bd753566e444a2",
         },
         .zig_glfw = .{
             .url = "git+https://github.com/griush/zig-glfw#4086ec77f2180e285a260412fb4f10605dbb1625",
