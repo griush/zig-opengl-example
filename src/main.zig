@@ -30,6 +30,11 @@ const default_shader_frag_src =
     \\}
 ;
 
+fn glfwWindowSizeCallback(window: glfw.Window, width: i32, height: i32) void {
+    _ = window;
+    gl.Viewport(0, 0, @intCast(width), @intCast(height));
+}
+
 fn glDebugCallback(source: c_uint, t: c_uint, id: c_uint, severity: c_uint, length: c_int, message: [*:0]const u8, user_param: ?*const anyopaque) callconv(.C) void {
     _ = user_param; // autofix
     _ = length; // autofix
@@ -60,6 +65,8 @@ pub fn main() !void {
         @panic("could not get glproc");
     }
     gl.makeProcTableCurrent(&gl_procs);
+
+    window.?.setSizeCallback(glfwWindowSizeCallback);
 
     gl.Enable(gl.DEBUG_OUTPUT);
     gl.Enable(gl.DEBUG_OUTPUT_SYNCHRONOUS);
@@ -166,7 +173,7 @@ pub fn main() !void {
             },
         }
 
-        gl.ClearColor(0.0, 0.0, 0.0, 1);
+        gl.ClearColor(0.05, 0.05, 0.1, 1);
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         const tint = zm.Vec3.from(.{ 0.0, 0.0, 0.0 });
